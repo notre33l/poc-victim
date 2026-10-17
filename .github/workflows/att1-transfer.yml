@@ -1,0 +1,73 @@
+# ATT-1 decision-vs-use probe: issues event identity divergence on transferred
+# issues. Mirrors examples/claude.yml trigger semantics (issues: types: [opened]
+# + body trigger phrase) and runs the action at the hunt pin. The claude job is
+# gated to action == 'opened' exactly like the shipped types list; a cheap
+# always-on probe job logs EVERY issues action so the platform semantics of
+# issue transfer (which action fires in the target repo, who sender is) are
+# captured even if 'opened' never fires.
+name: att1-transfer-probe
+on:
+  issues:
+    types: [opened, transferred, edited, assigned, labeled, closed, reopened]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+jobs:
+  probe-log:
+    if: github.event.action != 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: event-identities
+        env:
+          EVENT_ACTION: ${{ github.event.action }}
+          ACTOR: ${{ github.actor }}
+          SENDER: ${{ github.event.sender.login }}
+          ISSUE_USER: ${{ github.event.issue.user.login }}
+          ISSUE_USER_TYPE: ${{ github.event.issue.user.type }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          echo "ATT1-PROBE action=$EVENT_ACTION"
+          echo "ATT1-PROBE github.actor=$ACTOR"
+          echo "ATT1-PROBE sender=$SENDER"
+          echo "ATT1-PROBE issue.user=$ISSUE_USER type=$ISSUE_USER_TYPE"
+          echo "ATT1-PROBE issue.number=$ISSUE_NUMBER"
+          echo "ATT1-PROBE body_sha=$(printf '%s' "$ISSUE_BODY" | sha256sum | cut -c1-16)"
+          echo "ATT1-PROBE body_head=$(printf '%s' "$ISSUE_BODY" | head -c 120)"
+
+  claude:
+    if: github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: event-identities
+        env:
+          EVENT_ACTION: ${{ github.event.action }}
+          ACTOR: ${{ github.actor }}
+          SENDER: ${{ github.event.sender.login }}
+          ISSUE_USER: ${{ github.event.issue.user.login }}
+          ISSUE_USER_TYPE: ${{ github.event.issue.user.type }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          echo "ATT1-E2E action=$EVENT_ACTION"
+          echo "ATT1-E2E github.actor=$ACTOR"
+          echo "ATT1-E2E sender=$SENDER"
+          echo "ATT1-E2E issue.user=$ISSUE_USER type=$ISSUE_USER_TYPE"
+          echo "ATT1-E2E issue.number=$ISSUE_NUMBER"
+          echo "ATT1-E2E body_sha=$(printf '%s' "$ISSUE_BODY" | sha256sum | cut -c1-16)"
+          echo "ATT1-E2E body_head=$(printf '%s' "$ISSUE_BODY" | head -c 120)"
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code (pin 374f254)
+        id: claude
+        uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 12"
