@@ -67,7 +67,7 @@ jobs:
 
       - name: Run Claude Code (pin 374f254)
         id: claude
-        uses: anthropics/claude-code-action@374f254f5efaf968abfe15d399fd90972e8138b9
+        uses: anthropics/claude-code-action@8041f1d17e0e7d2f2cfe35002962e9f26237c0bb
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: "--max-turns 12"
